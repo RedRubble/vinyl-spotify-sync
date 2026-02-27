@@ -57,75 +57,19 @@ if ! [ -d "${install_path}/log" ]; then
     mkdir -p "${install_path}/log" && echo "✔ Log directory created."
 fi
 
-echo "==> Setting up the Weather API..."
-echo "Please enter your OpenWeatherMap API key:"
-read -r openweathermap_api_key
-echo "Enter your location coordinates in the 'latitude,longitude' format:"
-read -r geo_coordinates
-
 echo "==> Setting up the Spotify API..."
 echo "Please enter your Spotify client ID:"
 read -r spotify_client_id
 echo "Please enter your Spotify client secret:"
 read -r spotify_client_secret
-echo "Please enter your Spotify playlist ID:"
-read -r spotify_playlist_id
-
-echo "==> Setting up the configuration in config.yaml..."
-echo "Select your Inky Impression display size:"
-echo "1) 4.0 inch"
-echo "2) 5.7 inch"
-echo "3) 7.3 inch"
-read -r -p "Enter choice (1/2/3): " display_size_choice
-
-case $display_size_choice in
-  1)
-    display_width=640
-    display_height=400
-    album_cover_size=200
-    ;;
-  2)
-    display_width=600
-    display_height=448
-    album_cover_size=250
-    ;;
-  3)
-    display_width=800
-    display_height=480
-    album_cover_size=300
-    ;;
-  *)
-    echo "Invalid choice. Defaulting to 5.7 inch settings."
-    display_width=600
-    display_height=448
-    album_cover_size=250
-    ;;
-esac
+echo "Please enter your Spotify device name:"
+read -r spotify_device_name
 
 cat <<EOF > "${install_path}/config/config.yaml"
-display:
-  width: $display_width
-  height: $display_height
-  small_album_cover: true
-  small_album_cover_px: $album_cover_size
-  screensaver_image: "${install_path}/resources/default.jpg"
-  font_path: "${install_path}/resources/CircularStd-Bold.otf"
-  font_size_title: 45
-  font_size_subtitle: 35
-  offset_left_px: 20
-  offset_right_px: 20
-  offset_top_px: 0
-  offset_bottom_px: 20
-  offset_text_shadow_px: 4
-
-weather:
-  openweathermap_api_key: "${openweathermap_api_key}"
-  geo_coordinates: "${geo_coordinates}"
-
 spotify:
   client_id: "${spotify_client_id}"
   client_secret: "${spotify_client_secret}"
-  playlist_id: ${spotify_playlist_id}
+  device_name: "${device_name}"
 
 log:
   log_file_path: "${install_path}/log/now_playing.log"
@@ -153,4 +97,4 @@ sudo systemctl start now-playing
 sudo systemctl enable now-playing
 echo "✔ now-playing systemd service installed and started."
 
-echo "🎉 Setup is complete! Your now-playing display is configured."
+echo "🎉 Setup is complete!"
