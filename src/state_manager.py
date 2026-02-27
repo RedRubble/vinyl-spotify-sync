@@ -10,7 +10,7 @@ from logger import Logger
 class PlayState(Enum):
     CLEAN = 0
     PLAYING = 1
-    SCREENSAVER = 2
+    STOPPED = 2
     UNKNOWN = 5
 
 
@@ -38,6 +38,10 @@ class StateManager:
 
     def _set_state(self, new_state: PlayState, data: Optional[StateData]) -> None:
         old_state = self._state.current
+
+        if old_state == new_state == PlayState.STOPPED and self._state.data == data:
+            return
+
         self._state = AppState(
             current=new_state,
             data=data
@@ -50,6 +54,9 @@ class StateManager:
     def set_playing_state(self, song_title: str, song_artist: str) -> None:
         playing_state = PlayingState(song_title=song_title, song_artist=song_artist)
         self._set_state(PlayState.PLAYING, playing_state)
+
+    def set_stopped_state(self) -> None:
+        self._set_state(PlayState.STOPPED, None)
 
     def update_last_music_detected_time(self) -> None:
         self._last_music_detected_time = datetime.datetime.now()

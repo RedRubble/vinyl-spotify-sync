@@ -3,11 +3,12 @@ import sys
 import numpy as np
 import traceback
 import signal
-from typing import Tuple, Final
+from typing import Tuple, Final, Optional
 
 from logger import Logger
 from config import Config
 from state_manager import StateManager, PlayState
+
 
 from service.song_identify_service import SongIdentifyService, SongInfo
 from audio_processing_utils import AudioProcessingUtils
@@ -41,6 +42,7 @@ class NowPlaying:
         self._state_manager: StateManager = StateManager()
 
         self.set_clean_state()
+        self._audio_buffer: Optional[np.ndarray] = None
 
     def run(self) -> None:
         while True:
@@ -65,6 +67,14 @@ class NowPlaying:
             target_sampling_rate=NowPlaying.SUPPORTED_SAMPLING_RATE_BY_MUSIC_DETECTION_MODEL
         )
         is_music_detected = self._music_detection_service.is_music_detected(resampled_audio)
+
+        # Build up a 10 second buffer by combining last two recordings
+        if self._audio_buffer is None:
+            self._audio_buffer = audio
+        else:
+            self._audio_buffer = np.concatenate((self._audio_buffer, audio))[
+                                 -NowPlaying.AUDIO_DEVICE_SAMPLING_RATE * 10:]
+
         return audio, is_music_detected
 
     def _handle_music_detected(self, audio: np.ndarray) -> None:
@@ -74,9 +84,8 @@ class NowPlaying:
                 and (self._state_manager.get_state().current != PlayState.PLAYING
                      or self._state_manager.music_still_playing_but_different_song_identified(song_info.title))
         ):
-            self._set_playing_state(song_info)
-
-        self._state_manager.update_last_music_detected_time()
+            self._state_manager.set_playing_state(song_info.title, song_info.artist)
+            self.play_spotify()
 
     def _trigger_song_identify(self, audio: np.ndarray) -> SongInfo:
         int16_audio = AudioProcessingUtils.float32_to_int16(audio)
@@ -86,15 +95,19 @@ class NowPlaying:
         )
         return self._song_identify_service.identify(wav_audio)
 
-    def _set_playing_state(self, song_info: SongInfo) -> None:
-        self._state_manager.set_playing_state(song_info.title, song_info.artist)
-
     def _handle_no_music_detected(self) -> None:
-        if (
-                self._state_manager.get_state().current != PlayState.SCREENSAVER and self._state_manager.no_music_detected_for_more_than_a_minute()
-        ):
-            #TODO: Something with Spotify
-            print("TODO")
+        # if (
+        #         self._state_manager.get_state().current != PlayState.IDLE and self._state_manager.no_music_detected_for_more_than_a_minute()
+        # ):
+        self._audio_buffer = None
+
+        if self._state_manager.get_state().current == PlayState.PLAYING:
+            device_id = self._spotify_service.get_device_id(self._config['spotify']['device_name'])
+            if device_id:
+                self._spotify_service.pause_playback(device_id)
+
+        self._state_manager.set_stopped_state()
+
 
     @staticmethod
     def _handle_exit(_sig, _frame):
@@ -103,6 +116,22 @@ class NowPlaying:
     def set_clean_state(self) -> None:
         self._state_manager.set_clean_state()
 
+    def play_spotify(self) -> None:
+        try:
+            if not self._state_manager.get_state().current == PlayState.PLAYING:
+                return
+
+            title = self._state_manager.get_playing_state().song_title
+            artist = self._state_manager.get_playing_state().song_artist
+            track_uri = [self._spotify_service.search_track_uri(title, artist)]
+            device_id = self._spotify_service.get_device_id(self._config['spotify']['device_name'])
+
+            if track_uri:
+                self._logger.debug(f"Sending track '{track_uri}' to Spotify on device '{device_id}'.")
+                self._spotify_service.play_song(track_uri, device_id)
+        except Exception as e:
+            self._logger.error(f"Error occurred: {e}")
+            self._logger.error(traceback.format_exc())
 
 if __name__ == "__main__":
     service = NowPlaying()

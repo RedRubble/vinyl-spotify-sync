@@ -2,7 +2,7 @@ import csv
 import logging
 
 import numpy as np
-from tflite_runtime.interpreter import Interpreter
+from tensorflow.lite.python.interpreter import Interpreter
 from typing import List, Tuple, Final
 
 import sys

@@ -3,7 +3,7 @@ from spotipy import SpotifyOAuth
 SPOTIFY_CLIENT_ID = "<client-id>"
 SPOTIFY_CLIENT_SECRET = "<client-secret>"
 SPOTIFY_REDIRECT_URI = "http://127.0.0.1:8888/callback"
-SPOTIFY_SCOPE = "playlist-modify-public playlist-modify-private"
+SPOTIFY_SCOPE = "user-read-playback-state user-modify-playback-state user-read-currently-playing streaming user-read-playback-position"
 
 auth = SpotifyOAuth(
     client_id=SPOTIFY_CLIENT_ID,
