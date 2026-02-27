@@ -10,3 +10,5 @@ config/*
 /now-playing
 /.env
 .DS_Store
+/log/
+/config/
