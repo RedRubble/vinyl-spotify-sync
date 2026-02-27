@@ -4,21 +4,15 @@ import numpy as np
 import traceback
 import signal
 from typing import Tuple, Final
-import gpiod
-import gpiodevice
-from gpiod.line import Bias, Direction, Edge
-import threading
 
 from logger import Logger
 from config import Config
-from state_manager import StateManager, DisplayState
+from state_manager import StateManager, PlayState
 
 from service.song_identify_service import SongIdentifyService, SongInfo
 from audio_processing_utils import AudioProcessingUtils
 from service.audio_recording_service import AudioRecordingService
 from service.music_detection_service import MusicDetectionService
-from service.weather_service import WeatherService, WeatherInfo
-from service.display_service import DisplayService
 from service.spotify_service import SpotifyService
 
 
@@ -27,10 +21,6 @@ class NowPlaying:
     AUDIO_DEVICE_NUMBER_OF_CHANNELS: Final[int] = 1
     AUDIO_RECORDING_DURATION_IN_SECONDS: Final[int] = 5
     SUPPORTED_SAMPLING_RATE_BY_MUSIC_DETECTION_MODEL: Final[int] = 16000
-
-    BUTTONS = [5, 6, 16, 24]
-    LABELS = ["A", "B", "C", "D"]
-    INPUT = gpiod.LineSettings(direction=Direction.INPUT, bias=Bias.PULL_UP, edge_detection=Edge.FALLING)
 
     def __init__(self) -> None:
         signal.signal(signal.SIGTERM, self._handle_exit)  # System or process termination
@@ -47,14 +37,10 @@ class NowPlaying:
             audio_duration_in_seconds=NowPlaying.AUDIO_RECORDING_DURATION_IN_SECONDS
         )
         self._song_identify_service: SongIdentifyService = SongIdentifyService()
-        self._weather_service: WeatherService = WeatherService()
-        self._display_service: DisplayService = DisplayService()
         self._spotify_service: SpotifyService = SpotifyService()
         self._state_manager: StateManager = StateManager()
 
-        self._clean_display_and_set_clean_state()
-        self._setup_buttons()
-        self._start_button_listener()
+        self.set_clean_state()
 
     def run(self) -> None:
         while True:
@@ -85,10 +71,10 @@ class NowPlaying:
         song_info = self._trigger_song_identify(audio)
         if (
                 song_info
-                and (self._state_manager.get_state().current != DisplayState.PLAYING
+                and (self._state_manager.get_state().current != PlayState.PLAYING
                      or self._state_manager.music_still_playing_but_different_song_identified(song_info.title))
         ):
-            self._set_playing_state_and_update_display(song_info)
+            self._set_playing_state(song_info)
 
         self._state_manager.update_last_music_detected_time()
 
@@ -100,68 +86,22 @@ class NowPlaying:
         )
         return self._song_identify_service.identify(wav_audio)
 
-    def _set_playing_state_and_update_display(self, song_info: SongInfo) -> None:
-        if self._state_manager.should_clean_display():
-            self._clean_display_and_set_clean_state()
+    def _set_playing_state(self, song_info: SongInfo) -> None:
         self._state_manager.set_playing_state(song_info.title, song_info.artist)
-        self._display_service.update_display_to_playing(song_info)
-        self._state_manager.increase_image_counter()
 
     def _handle_no_music_detected(self) -> None:
         if (
-                self._state_manager.get_state().current != DisplayState.SCREENSAVER and self._state_manager.no_music_detected_for_more_than_a_minute()
-                or self._state_manager.screensaver_still_up_but_weather_info_outdated()
+                self._state_manager.get_state().current != PlayState.SCREENSAVER and self._state_manager.no_music_detected_for_more_than_a_minute()
         ):
-            weather_info = self._weather_service.get_weather_info()
-            self._set_screensaver_state_and_update_display(weather_info)
-
-    def _set_screensaver_state_and_update_display(self, weather_info: WeatherInfo) -> None:
-        if self._state_manager.should_clean_display():
-            self._clean_display_and_set_clean_state()
-        self._state_manager.set_screensaver_state(weather_info)
-        self._display_service.update_display_to_screensaver(weather_info)
-        self._state_manager.increase_image_counter()
+            #TODO: Something with Spotify
+            print("TODO")
 
     @staticmethod
     def _handle_exit(_sig, _frame):
         sys.exit(0)
 
-    def _clean_display_and_set_clean_state(self) -> None:
-        self._display_service.clean_display()
+    def set_clean_state(self) -> None:
         self._state_manager.set_clean_state()
-
-    def _setup_buttons(self) -> None:
-        chip = gpiodevice.find_chip_by_platform()
-        self.OFFSETS = [chip.line_offset_from_id(id) for id in NowPlaying.BUTTONS]
-        line_config = dict.fromkeys(self.OFFSETS, NowPlaying.INPUT)
-        self.request = chip.request_lines(consumer="inky7-buttons", config=line_config)
-
-    def _start_button_listener(self) -> None:
-        def listen():
-            while True:
-                for event in self.request.read_edge_events():
-                    index = self.OFFSETS.index(event.line_offset)
-                    button_label = NowPlaying.LABELS[index]
-                    self._logger.debug(f"Button {button_label} pressed")
-
-                    if button_label == "A":
-                        self._handle_button_a()
-
-        threading.Thread(target=listen, daemon=True).start()
-
-    def _handle_button_a(self) -> None:
-        try:
-            if not self._state_manager.get_state().current == DisplayState.PLAYING:
-                return
-            title = self._state_manager.get_playing_state().song_title
-            artist = self._state_manager.get_playing_state().song_artist
-            track_uri = self._spotify_service.search_track_uri(title, artist)
-
-            if track_uri:
-                self._spotify_service.add_to_playlist(track_uri)
-        except Exception as e:
-            self._logger.error(f"Error occurred: {e}")
-            self._logger.error(traceback.format_exc())
 
 
 if __name__ == "__main__":

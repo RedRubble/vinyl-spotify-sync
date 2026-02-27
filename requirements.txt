@@ -10,3 +10,4 @@ tflite-runtime
 typing
 pyyaml
 spotipy
+shazamio

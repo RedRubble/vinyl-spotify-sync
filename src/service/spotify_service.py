@@ -40,11 +40,3 @@ class SpotifyService:
         except Exception as e:
             self._logger.error(f"Error searching for track '{title}' by '{artist}': {e}")
             return None
-
-    def add_to_playlist(self, track_uri: str) -> None:
-        try:
-            playlist_id = self._config['spotify']['playlist_id']
-            self.sp.playlist_add_items(playlist_id, [track_uri])
-            self._logger.info(f"Successfully added track '{track_uri}' to playlist '{playlist_id}'.")
-        except Exception as e:
-            self._logger.error(f"Failed to add track '{track_uri}' to playlist: {e}.")
