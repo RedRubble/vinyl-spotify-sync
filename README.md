@@ -1,52 +1,30 @@
-# 🎶 Now-playing
+# 🎶 Vinyl-Spotify-Sync
 
-**Now-playing** is a Python application for the Raspberry Pi that listens for background music, identifies the
-song, and displays the song information on an e-ink display.
+**Vinyl-Spotify-Sync** is a Python application for the Raspberry Pi that listens for background music, identifies the
+song, and plays the song on a specified device.
+
+This project is a fork of [Now-Playing](https://spotipy.readthedocs.io/en/2.25.1/), with the change to play music
+to a Spotify device, rather than display to an eink display.
 
 > This project was born out of a personal need: I love listening to vinyl, but since it's analog, I wasn't able to
 > easily tell what song was playing. Sure, you can count the spaces in the grooves, but that's not exactly convenient.
 > The same goes for music in films—I'd often reach for my phone to Shazam a song. Now, I just glance at my display.
-
-<table>
-<tr>
-<td><img src="resources/readme/example-image-1.jpeg" width="500px" alt="Example Image 1"/></td>
-<td><img src="resources/readme/example-image-2.jpeg" width="500px" alt="Example Image 2"/></td>
-</tr>
-</table>
 
 ## 🚀 Features
 
 - Detects music using a
   local [YAMNet](https://www.kaggle.com/models/google/yamnet/tensorFlow2/yamnet/1?tfhub-redirect=true) ML model
 - When music is detected, identifies the song with [ShazamIO](https://github.com/shazamio/ShazamIO)
-- Displays song title, artist, and album cover on an e-ink display
-- Pressing Button A on the e-ink display adds the current song to a Spotify playlist
-  with [Spotipy](https://spotipy.readthedocs.io/en/2.25.1/)
-- When no music is detected for a while, the display switches to a screensaver mode that shows the weather
+- Begins playing the song on a specified Spotify device with [Spotipy](https://spotipy.readthedocs.io/en/2.25.1/)
 
 ## ✨ What's New?
 
-This project builds on and refactors several previous works (see [LICENSE](./LICENSE)):
+This project builds on and refactors several previous works (see [LICENSE](./LICENSE)).
 
+- [Now-Playing](https://spotipy.readthedocs.io/en/2.25.1/)
 - [spotipi-eink (original)](https://github.com/ryanwa18/spotipi-eink)
 - [spotipi-eink (fork)](https://github.com/Gabbajoe/spotipi-eink)
 - [shazampi-eink (fork)](https://github.com/ravi72munde/shazampi-eink)
-
-All credits for the original idea go to them. While they laid the groundwork, this version focuses on clean code,
-modularity, and extensibility.
-
-### ♻️ Improvements
-
-- Simplified, readable logic with meaningful function names
-- Clear separation of concerns with dedicated services (e.g., `DisplayService` has all logic concerning the e-ink
-  display)
-- Application state is handled via a centralized `StateManager`
-- Type hints added for better clarity and IDE support
-- Configurations via YAML (no more messy INI files)
-- Cleaned up setup script for smoother installation
-- Singleton pattern for `Logger` and `Config`
-- Threaded button control for responsiveness
-- Many more...
 
 ## 📦 Installation & Setup
 
@@ -55,10 +33,6 @@ modularity, and extensibility.
 - [Raspberry Pi Zero 2 W](https://www.raspberrypi.com/products/raspberry-pi-zero-2-w/) *(or newer)*
 - [MicroSD card](https://www.raspberrypi.com/products/sd-cards/)
 - [Power supply](https://www.raspberrypi.com/products/micro-usb-power-supply/)
-- Pimoroni Inky Impression e-ink display
-    - [Pimoroni Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression-4?variant=39599238807635)
-    - [Pimoroni Inky Impression 5.7"](https://shop.pimoroni.com/products/inky-impression-5-7?variant=32298701324371)
-    - [Pimoroni Inky Impression 7.3"](https://shop.pimoroni.com/products/inky-impression-7-3?variant=55186435244411)
 - [USB microphone](https://www.amazon.com.be/microphone-portable-enregistrement-vid%C3%A9oconf%C3%A9rences-n%C3%A9cessaire/dp/B09PVPPRF2?source=ps-sl-shoppingads-lpcontext&ref_=fplfs&ref_=fplfs&psc=1&smid=A3HYZLWFA5CWB0&gQT=1)
   *(min. 16kHz sample rate)*
 - [USB-A to Micro-USB adapter](https://www.amazon.com.be/-/nl/Magnet-Adapter-Compatibel-Smartphones-randapparatuur/dp/B0CCSK6TWR/ref=sr_1_4?dib=eyJ2IjoiMSJ9.tSkQ7Eow3VuzOmbOparC3w6W72C_2lR7qR6GDXXFon_pZWGesfG0THfUPlsK47bxatu_2L-ennJAbfJOnxkvAT4PFFmsaLdhD5TxbF6-b5x0BBZ0cBfAzrGtuyrV64W2uwanSiruEmp4YzTr0veXeH0LK_YwEbmg6Cle6MP-_0hbOrEqdH83qKTqznjk0VJGjp1CmIb6v7-nMhO1tOFbc92DTz2RPYz207CHCzUXVuhVMyWsGMFb8oPqwCK_YbKaQtH0P0bKZqHN-uCreQRhWDefUiY6TUM6f6ryPNx2IaI.jD_UeNFvfX1JIecvwtP37jqDSlPx_A_PXUSiTBfzqCU&dib_tag=se&keywords=usb+a+to+micro+usb&qid=1752774830&s=electronics&sr=1-4)
@@ -75,17 +49,6 @@ modularity, and extensibility.
 
 ### 🔐 Required Credentials
 
-#### 🌦️ OpenWeatherMap API
-
-1. Sign up at [OpenWeatherMap](https://openweathermap.org/)
-2. Generate your API key
-3. Store it, you will need it later
-
-#### 📍Weather Coordinates
-
-1. Go to [Google Maps](https://www.google.com/maps) → Search your location → Right-click → Copy coordinates
-2. Store it, you will need it later
-
 #### 🎵 Spotify API
 
 1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
@@ -97,12 +60,6 @@ modularity, and extensibility.
     5. Check the 'Terms of Service'
 3. Click on 'Save'
 4. Store your Client ID and Client Secret, you will need it later
-
-#### 🆔 Spotify Playlist ID
-
-1. [Copy the Playlist ID](https://clients.caster.fm/knowledgebase/110/How-to-find-Spotify-playlist-ID.html#:~:text=To%20find%20the%20Spotify%20playlist,Link%22%20under%20the%20Share%20menu.&text=The%20playlist%20id%20is%20the,after%20playlist%2F%20as%20marked%20above.)
-   of the playlist you want your songs to be added to
-2. Store it, you will need it later
 
 #### 🎟 Spotify Access Token
 
@@ -160,36 +117,18 @@ Should you encounter any errors, check [Known Issues](#-known-issues)
 > - Updates the system and installs dependencies
 > - Sets up a Python virtual environment and installs Python packages
 > - Creates config, log, and resources directories
-> - Prompts for credentials, your e-ink display size and generates config.yaml
+> - Prompts for credentials, your device name and generates config.yaml
 > - Copies and configures a systemd service to autostart on boot
 > - Starts the now-playing service
 
 > 📂 <b>Resulting Config</b>
 >
 > ```yaml
-> display:
->   width: 600 # or 640 (4"), or 800 (7.3")
->   height: 448 # or 400 (4"), or 480 (7.3")
->   small_album_cover: true
->   small_album_cover_px: 250 # or 200 (4"), or 300 (7.3")
->   screensaver_image: "resources/default.jpg"
->   font_path: "resources/CircularStd-Bold.otf"
->   font_size_title: 45
->   font_size_subtitle: 35
->   offset_left_px: 20
->   offset_right_px: 20
->   offset_top_px: 0
->   offset_bottom_px: 20
->   offset_text_shadow_px: 4
-> 
-> weather:
->   openweathermap_api_key: "YOUR_API_KEY"
->   geo_coordinates: "LAT,LON"
-> 
 > spotify:
 >   client_id: "YOUR_SPOTIFY_CLIENT_ID"
 >   client_secret: "YOUR_SPOTIFY_CLIENT_SECRET"
 >   playlist_id: "YOUR_SPOTIFY_PLAYLIST_ID"
+>   device_name: "YOUR_DEVICE_NAME"
 > 
 > log:
 >   log_file_path: "log/now_playing.log"
@@ -276,39 +215,3 @@ To boost your microphone’s gain:
 
 ```bash
   sudo alsactl store
-```
-
-### GPIO Chip Conflict
-
-If you see:
-
-```
-Woah there, some pins we need are in use!
-     Chip Select: (line 8, GPIO8) currently claimed by spi0 CS0
-```
-
-Just recently (16/08/2024), the GPIO Kernel Module in Raspberry PI OS changed
-
-➡️ Check https://github.com/pimoroni/inky?tab=readme-ov-file#chip-select-line-8-gpio8-currently-claimed-by-spi0-cs0 and
-follow the instructions
-
-## 🔮 What's Next?
-
-### More Button Actions
-
-There are still three unused buttons on the e-ink display. These could be mapped to additional features.
-
-### HTML Rendering
-
-The Pimoroni Inky display actually
-supports [rendering HTML](https://github.com/pimoroni/inky/tree/main/examples/7color/html), opening up all sorts of
-design possibilities.
-This could make the interface:
-
-- More customizable and visually rich
-- Easier to tweak via CSS/HTML templates
-- Support dynamic layouts or themes
-
-If you have more ideas for new features or you'd like to get involved, feel free to open an issue or submit a PR!
-
-
