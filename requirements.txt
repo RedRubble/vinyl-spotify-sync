@@ -6,3 +6,4 @@ numpy
 shazamio
 pyyaml
 spotipy
+ai_edge_litert

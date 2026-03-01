@@ -2,7 +2,7 @@ import csv
 import logging
 
 import numpy as np
-from tensorflow.lite.python.interpreter import Interpreter
+from ai_edge_litert.interpreter import Interpreter
 from typing import List, Tuple, Final
 
 import sys
