@@ -4,6 +4,7 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from typing import Optional
 import logging
+from dataclasses import dataclass
 
 import sys
 from time import sleep
@@ -11,6 +12,13 @@ from time import sleep
 sys.path.append("..")
 from logger import Logger
 from config import Config
+
+
+@dataclass
+class Track:
+    uri: str
+    offset: int
+    context_uri: str
 
 
 class SpotifyService:
@@ -22,7 +30,8 @@ class SpotifyService:
             client_id=self._config['spotify']['client_id'],
             client_secret=self._config['spotify']['client_secret'],
             redirect_uri="http://127.0.0.1:8888/callback",
-            scope="user-read-playback-state user-modify-playback-state user-read-currently-playing streaming user-read-playback-position",
+            scope="user-read-playback-state user-modify-playback-state user-read-currently-playing streaming "
+                  "user-read-playback-position",
             open_browser=False  # Important for headless mode
         ))
 
@@ -49,7 +58,7 @@ class SpotifyService:
             self.sp.next_track()
             self.sp.pause_playback()
             sleep(0.4)
-            self.sp.transfer_playback(device_id=self._saved_session['device_id'],force_play=False)
+            self.sp.transfer_playback(device_id=self._saved_session['device_id'], force_play=False)
 
             self._logger.info(f"Restored previous session to {self._saved_session['device_id']}")
             self._saved_session = None
@@ -57,29 +66,41 @@ class SpotifyService:
             self._logger.error(f"Failed to restore previous session: {e}")
             self._logger.error(traceback.format_exc())
 
-    def search_track_uri(self, title: str, artist: str) -> Optional[str]:
+    def search_track(self, title: str, artist: str) -> Optional[Track]:
         query = f"track:{title} artist:{artist}"
-        self._logger.debug(f"Searching for track with query: {query}")
-
         try:
-            results = self.sp.search(q=query, type="track", limit=1)
+            results = self.sp.search(q=query, type="track", limit=5)
             tracks = results.get('tracks', {}).get('items', [])
 
-            if tracks:
-                track_uri = tracks[0]['uri']
-                self._logger.info(f"Found track URI: {track_uri}")
-                return track_uri
+            if not tracks:
+                return None
 
-            self._logger.warning(f"No track found for '{title}' by '{artist}'.")
-            return None
+            for track in tracks:
+                # Prioritise an album over a single
+                if track['album']['album_type'] == 'album':
+                    self._logger.debug(f"Found album track '{track['name']}' for query '{query}'.")
+                    return Track(
+                        uri=track['uri'],
+                        offset=track['track_number'] - 1,  # Spotify offset is 0-indexed
+                        context_uri=track['album']['uri']
+                    )
+
+            self._logger.debug(f"No album track found, using first result '{tracks[0]['name']}' for query '{query}'.")
+            track = tracks[0]
+            return Track(
+                uri=track['uri'],
+                offset=track['track_number'] - 1,
+                context_uri=track['album']['uri']
+            )
+
         except Exception as e:
-            self._logger.error(f"Error searching for track '{title}' by '{artist}': {e}")
+            self._logger.error(f"Failed to search for track '{query}': {e}")
             return None
 
     def get_current_playback(self):
         return self.sp.current_playback()
 
-    def play_song(self, uris, device_id) -> None:
+    def play_song(self, uris, device_id, context_uri=None, offset=None) -> None:
         if device_id is None:
             self._logger.error("Cannot play track, given device name does not exist (device_id is None).")
             return
@@ -93,7 +114,8 @@ class SpotifyService:
 
             if is_playing and current_device_id != device_id:
                 self._logger.error(
-                    f"Failed to play track '{uris}' on device '{device_id}', another device '{playback['device']['name']}' is currently in use.")
+                    f"Failed to play track '{uris}' on device '{device_id}', another device "
+                    f"'{playback['device']['name']}' is currently in use.")
                 return
 
             if not is_playing and current_device_id != device_id:
@@ -107,7 +129,8 @@ class SpotifyService:
                 position_ms = playback['progress_ms']
 
         try:
-            self.sp.start_playback(device_id=device_id, uris=uris, position_ms=position_ms)
+            self.sp.start_playback(device_id=device_id, context_uri=context_uri, offset={"position": offset}
+                                   if offset is not None else None)
             self._logger.debug(f"Playing track '{uris}' on device '{device_id}' at position {position_ms}ms.")
         except Exception as e:
             self._logger.error(f"Failed to start playback: {e}")

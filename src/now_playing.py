@@ -149,12 +149,18 @@ class NowPlaying:
 
             title = self._state_manager.get_playing_state().song_title
             artist = self._state_manager.get_playing_state().song_artist
-            track_uri = [self._spotify_service.search_track_uri(title, artist)]
+            track = self._spotify_service.search_track(title, artist)
             device_id = self._spotify_service.get_device_id(self._config['spotify']['device_name'])
 
-            if track_uri:
-                self._logger.debug(f"Sending track '{track_uri}' to Spotify on device '{device_id}'.")
-                self._spotify_service.play_song(track_uri, device_id)
+            if track:
+                self._logger.debug(f"Sending track '{track.uri}' to Spotify on device '{device_id}'.")
+                self._spotify_service.play_song(
+                    uris=[track.uri],
+                    device_id=device_id,
+                    context_uri=track.context_uri,
+                    offset=track.offset
+                )
+
         except Exception as e:
             self._logger.error(f"Error occurred: {e}")
             self._logger.error(traceback.format_exc())
