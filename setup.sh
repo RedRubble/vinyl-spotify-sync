@@ -5,12 +5,6 @@ if [[ $EUID -eq 0 ]]; then
   exit 1
 fi
 
-echo "==> Enabling SPI..."
-sudo raspi-config nonint do_spi 0 && echo "✔ SPI is enabled."
-
-echo "==> Enabling I2C..."
-sudo raspi-config nonint do_i2c 0 && echo "✔ I2C is enabled."
-
 echo "==> Updating package lists..."
 sudo apt update && echo "✔ Package lists updated successfully."
 
@@ -27,7 +21,7 @@ if [ -d "now-playing" ]; then
 fi
 
 echo "==> Cloning the now-playing project from GitHub..."
-git clone https://github.com/maurocastermans/now-playing && echo "✔ Project cloned successfully."
+git clone https://github.com/RedRubble/vinyl-spotify-sync && echo "✔ Project cloned successfully."
 echo "Switching to the installation directory."
 cd now-playing || exit
 install_path=$(pwd)
