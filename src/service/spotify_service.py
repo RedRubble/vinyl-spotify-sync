@@ -17,6 +17,7 @@ class SpotifyService:
     def __init__(self):
         self._logger: logging.Logger = Logger().get_logger()
         self._config: dict = Config().get_config()
+        self._saved_session = None
         self.sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
             client_id=self._config['spotify']['client_id'],
             client_secret=self._config['spotify']['client_secret'],
@@ -24,6 +25,37 @@ class SpotifyService:
             scope="user-read-playback-state user-modify-playback-state user-read-currently-playing streaming user-read-playback-position",
             open_browser=False  # Important for headless mode
         ))
+
+    def _save_session(self) -> None:
+        playback = self.get_current_playback()
+        if not playback or not playback.get('item'):
+            return
+
+        self._saved_session = {
+            'device_id': playback['device']['id'],
+            'shuffle_state': playback['shuffle_state'],
+            'repeat_state': playback['repeat_state'],
+        }
+        self._logger.info(f"Saved session: {self._saved_session['device_id']}.")
+
+    def restore_previous_session(self) -> None:
+        if not self._saved_session:
+            self._logger.debug("No previous session to restore.")
+            return
+
+        try:
+            self.sp.shuffle(self._saved_session['shuffle_state'])
+            self.sp.repeat(self._saved_session['repeat_state'])
+            self.sp.next_track()
+            self.sp.pause_playback()
+            sleep(0.4)
+            self.sp.transfer_playback(device_id=self._saved_session['device_id'],force_play=False)
+
+            self._logger.info(f"Restored previous session to {self._saved_session['device_id']}")
+            self._saved_session = None
+        except Exception as e:
+            self._logger.error(f"Failed to restore previous session: {e}")
+            self._logger.error(traceback.format_exc())
 
     def search_track_uri(self, title: str, artist: str) -> Optional[str]:
         query = f"track:{title} artist:{artist}"
@@ -44,14 +76,6 @@ class SpotifyService:
             self._logger.error(f"Error searching for track '{title}' by '{artist}': {e}")
             return None
 
-    def add_to_playlist(self, track_uri: str) -> None:
-        try:
-            playlist_id = self._config['spotify']['playlist_id']
-            self.sp.playlist_add_items(playlist_id, [track_uri])
-            self._logger.info(f"Successfully added track '{track_uri}' to playlist '{playlist_id}'.")
-        except Exception as e:
-            self._logger.error(f"Failed to add track '{track_uri}' to playlist: {e}.")
-
     def get_current_playback(self):
         return self.sp.current_playback()
 
@@ -61,7 +85,7 @@ class SpotifyService:
             return
 
         playback = self.get_current_playback()
-        position_ms = None
+        position_ms = 1500
 
         if playback:
             current_device_id = playback['device']['id']
@@ -73,6 +97,7 @@ class SpotifyService:
                 return
 
             if not is_playing and current_device_id != device_id:
+                self._save_session()
                 self.sp.transfer_playback(device_id, force_play=False)
                 self._logger.info(f"Transferred playback from '{current_device_id}' to '{device_id}'.")
                 sleep(0.4)
@@ -83,7 +108,7 @@ class SpotifyService:
 
         try:
             self.sp.start_playback(device_id=device_id, uris=uris, position_ms=position_ms)
-            self._logger.debug(f"Playing track '{uris}' on device '{device_id}' at position {position_ms or 0}ms.")
+            self._logger.debug(f"Playing track '{uris}' on device '{device_id}' at position {position_ms}ms.")
         except Exception as e:
             self._logger.error(f"Failed to start playback: {e}")
             self._logger.error(traceback.format_exc())
@@ -110,4 +135,4 @@ class SpotifyService:
             else:
                 self._logger.debug(f"Asked to pause playing on '{device_id}', however device is {current_device_id}.")
         else:
-            self._logger.debug(f"Asked to pause playback however nothing is playing.")
+            self._logger.info(f"Asked to pause playback however nothing is playing.")

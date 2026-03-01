@@ -9,7 +9,6 @@ from logger import Logger
 from config import Config
 from state_manager import StateManager, PlayState
 
-
 from service.song_identify_service import SongIdentifyService, SongInfo
 from audio_processing_utils import AudioProcessingUtils
 from service.audio_recording_service import AudioRecordingService
@@ -20,8 +19,9 @@ from service.spotify_service import SpotifyService
 class NowPlaying:
     AUDIO_DEVICE_SAMPLING_RATE: Final[int] = 44100
     AUDIO_DEVICE_NUMBER_OF_CHANNELS: Final[int] = 1
-    AUDIO_RECORDING_DURATION_IN_SECONDS: Final[int] = 5
+    AUDIO_RECORDING_DURATION_IN_SECONDS: Final[int] = 10
     SUPPORTED_SAMPLING_RATE_BY_MUSIC_DETECTION_MODEL: Final[int] = 16000
+    NO_MUSIC_THRESHOLD: Final[int] = 4
 
     def __init__(self) -> None:
         signal.signal(signal.SIGTERM, self._handle_exit)  # System or process termination
@@ -43,6 +43,8 @@ class NowPlaying:
 
         self.set_idle_state()
         self._audio_buffer: Optional[np.ndarray] = None
+
+        self._no_music_counter: int = 0
 
     def run(self) -> None:
         while True:
@@ -69,7 +71,7 @@ class NowPlaying:
         )
         is_music_detected = self._music_detection_service.is_music_detected(resampled_audio)
 
-        # Build up a 10 second buffer by combining last two recordings
+        # Build up a 10-second buffer by combining last two recordings
         if self._audio_buffer is None:
             self._audio_buffer = audio
         else:
@@ -80,13 +82,26 @@ class NowPlaying:
 
     def _handle_music_detected(self, audio: np.ndarray) -> None:
         song_info = self._trigger_song_identify(audio)
-        if (
-                song_info
-                and (self._state_manager.get_state().current != PlayState.PLAYING
-                     or self._state_manager.music_still_playing_but_different_song_identified(song_info.title))
-        ):
+        self._no_music_counter = 0
+        self.stop_song_within_limit()
+
+        if (self._state_manager.get_state().current != PlayState.PLAYING
+                or self._state_manager.music_still_playing_but_different_song_identified(song_info.title)):
             self._state_manager.set_playing_state(song_info.title, song_info.artist)
             self.play_spotify()
+
+    def stop_song_within_limit(self):
+        if self._state_manager.get_state().current == PlayState.PLAYING:
+            playback = self._spotify_service.get_current_playback()
+            if playback and playback['is_playing'] and playback.get('item'):
+                duration = playback['item']['duration_ms']
+                progress = playback['progress_ms']
+                # If song ends within 10 seconds, pause
+                # We do this in order to not advance to the users queue that may or may not exist
+                if duration - progress < 10000:
+                    device_id = self._spotify_service.get_device_id(self._config['spotify']['device_name'])
+                    self._spotify_service.pause_playback(device_id)
+                    self._logger.debug(f"Song finishes within 10 seconds, pausing.")
 
     def _trigger_song_identify(self, audio: np.ndarray) -> SongInfo:
         int16_audio = AudioProcessingUtils.float32_to_int16(audio)
@@ -97,18 +112,28 @@ class NowPlaying:
         return self._song_identify_service.identify(wav_audio)
 
     def _handle_no_music_detected(self) -> None:
-        # if (
-        #         self._state_manager.get_state().current != PlayState.IDLE and self._state_manager.no_music_detected_for_more_than_a_minute()
-        # ):
+        self.stop_song_within_limit()
+        if self._state_manager.get_state().current == PlayState.PLAYING:
+            self._no_music_counter += 1
+
+            if self._no_music_counter < (NowPlaying.NO_MUSIC_THRESHOLD + 1):
+                self._logger.debug(
+                    f"No music detected ({self._no_music_counter}/{NowPlaying.NO_MUSIC_THRESHOLD}), waiting before stopping.")
+                return
+            else:
+                device_id = self._spotify_service.get_device_id(self._config['spotify']['device_name'])
+                if device_id:
+                    self._spotify_service.pause_playback(device_id)
+                self._no_music_counter = 0
         self._audio_buffer = None
 
-        if self._state_manager.get_state().current == PlayState.PLAYING:
-            device_id = self._spotify_service.get_device_id(self._config['spotify']['device_name'])
-            if device_id:
-                self._spotify_service.pause_playback(device_id)
+        if (self._state_manager.get_state().current == PlayState.STOPPED and
+                self._state_manager.no_music_detected_for_more_than_a_minute()):
+            self._state_manager.set_idle_state()
+            self._spotify_service.restore_previous_session()
 
-        self._state_manager.set_stopped_state()
-
+        if self._state_manager.get_state().current != PlayState.IDLE:
+            self._state_manager.set_stopped_state()
 
     @staticmethod
     def _handle_exit(_sig, _frame):
@@ -133,6 +158,7 @@ class NowPlaying:
         except Exception as e:
             self._logger.error(f"Error occurred: {e}")
             self._logger.error(traceback.format_exc())
+
 
 if __name__ == "__main__":
     service = NowPlaying()
