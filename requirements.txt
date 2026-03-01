@@ -4,10 +4,5 @@ scipy
 sounddevice
 numpy
 shazamio
-librosa
-inky
-tflite-runtime
-typing
 pyyaml
 spotipy
-shazamio
