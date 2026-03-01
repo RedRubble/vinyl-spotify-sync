@@ -1,3 +1,5 @@
+import traceback
+
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from typing import Optional
@@ -53,20 +55,34 @@ class SpotifyService:
         return self.sp.current_playback()
 
     def play_song(self, uris, device_id=None) -> None:
-        playback = self.get_current_playback()
-        if playback and playback['is_playing']:
-            current_device_id = playback['device']['id']
-            if current_device_id != device_id:
-                self._logger.error(
-                    f"Failed to play track '{uris}' to device '{playback['device']['name']} ({device_id})', another device is currently in use.")
-                return
-        # Don't restart song if already active song
-        if playback and playback.get('item') and playback['item']['uri'] in uris:
-            self.sp.start_playback(device_id=device_id, uris=uris, position_ms=playback['progress_ms'])
-        else:
-            self.sp.start_playback(device_id=device_id, uris=uris)
 
-        self._logger.debug(f"Playing track '{uris}' on device '{device_id}'.")
+        if device_id is None:
+            self._logger.error(f"Cannot play track, playback is {device_id} (no active device found).")
+            return
+
+        # Check we don't have an active session on another device
+        playback = self.get_current_playback()
+
+        if playback:
+            if playback['is_playing']:
+                current_device_id = playback['device']['id']
+
+                if current_device_id != device_id:
+                    self._logger.error(
+                        f"Failed to play track '{uris}' to device '{playback['device']['name']} ({device_id})', another device is currently in use.")
+                    return
+
+            # Don't restart song if already active song
+            if playback.get('item') and playback['item']['uri'] in uris:
+                self.sp.start_playback(device_id=device_id, uris=uris, position_ms=playback['progress_ms'])
+                self._logger.debug(f"Playing track '{uris}' on device '{device_id} at progess {playback['progress_ms']}'.")
+        else:
+            try:
+                self.sp.start_playback(device_id=device_id, uris=uris)
+                self._logger.debug(f"Playing track '{uris}' on device '{device_id}'.")
+            except Exception as e:
+                self._logger.error(f"Error occurred: {e}")
+                self._logger.error(traceback.format_exc())
 
     def get_devices(self):
         return self.sp.devices()
