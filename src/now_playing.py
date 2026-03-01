@@ -41,13 +41,14 @@ class NowPlaying:
         self._spotify_service: SpotifyService = SpotifyService()
         self._state_manager: StateManager = StateManager()
 
-        self.set_clean_state()
+        self.set_idle_state()
         self._audio_buffer: Optional[np.ndarray] = None
 
     def run(self) -> None:
         while True:
             try:
                 audio, is_music_detected = self._record_audio_and_detect_music()
+
                 if is_music_detected:
                     self._handle_music_detected(audio)
                 else:
@@ -113,8 +114,8 @@ class NowPlaying:
     def _handle_exit(_sig, _frame):
         sys.exit(0)
 
-    def set_clean_state(self) -> None:
-        self._state_manager.set_clean_state()
+    def set_idle_state(self) -> None:
+        self._state_manager.set_idle_state()
 
     def play_spotify(self) -> None:
         try:

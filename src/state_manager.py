@@ -8,7 +8,7 @@ from logger import Logger
 
 
 class PlayState(Enum):
-    CLEAN = 0
+    IDLE = 0
     PLAYING = 1
     STOPPED = 2
     UNKNOWN = 5
@@ -48,8 +48,8 @@ class StateManager:
         )
         self._logger.info(f"State changed from {old_state.name} to {new_state.name}.")
 
-    def set_clean_state(self) -> None:
-        self._set_state(PlayState.CLEAN, None)
+    def set_idle_state(self) -> None:
+        self._set_state(PlayState.IDLE, None)
 
     def set_playing_state(self, song_title: str, song_artist: str) -> None:
         playing_state = PlayingState(song_title=song_title, song_artist=song_artist)
