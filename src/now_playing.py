@@ -155,8 +155,8 @@ class NowPlaying:
             if track:
                 self._logger.debug(f"Sending track '{track.uri}' to Spotify on device '{device_id}'.")
                 self._spotify_service.play_song(
-                    uris=[track.uri],
                     device_id=device_id,
+                    uris=[track.uri],
                     context_uri=track.context_uri,
                     offset=track.offset
                 )

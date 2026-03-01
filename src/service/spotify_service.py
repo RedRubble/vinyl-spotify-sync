@@ -100,13 +100,21 @@ class SpotifyService:
     def get_current_playback(self):
         return self.sp.current_playback()
 
-    def play_song(self, uris, device_id, context_uri=None, offset=None) -> None:
+    def play_song(self, device_id, uris=None, context_uri=None, offset=None) -> None:
         if device_id is None:
             self._logger.error("Cannot play track, given device name does not exist (device_id is None).")
             return
 
+        if not uris and not context_uri:
+            self._logger.error("Cannot play track, either uris or context_uri must be provided.")
+            return
+
+        if (context_uri and not offset) or (not context_uri and offset):
+            self._logger.error("Cannot play track, both context_uri and offset must be provided.")
+            return
+
         playback = self.get_current_playback()
-        position_ms = 1500
+        position_ms = None
 
         if playback:
             current_device_id = playback['device']['id']
@@ -114,24 +122,26 @@ class SpotifyService:
 
             if is_playing and current_device_id != device_id:
                 self._logger.error(
-                    f"Failed to play track '{uris}' on device '{device_id}', another device "
-                    f"'{playback['device']['name']}' is currently in use.")
+                    f"Failed to play on device '{device_id}', another device '{playback['device']['name']}' is currently in use.")
                 return
 
             if not is_playing and current_device_id != device_id:
                 self._save_session()
-                self.sp.transfer_playback(device_id, force_play=False)
+                self.sp.transfer_playback(device_id, force_play=True)
                 self._logger.info(f"Transferred playback from '{current_device_id}' to '{device_id}'.")
                 sleep(0.4)
 
             # Resume from current position only if same track is loaded on the same device
-            if playback.get('item') and playback['item']['uri'] in uris and current_device_id == device_id:
+            if uris and playback.get('item') and playback['item']['uri'] in uris and current_device_id == device_id:
                 position_ms = playback['progress_ms']
 
         try:
-            self.sp.start_playback(device_id=device_id, context_uri=context_uri, offset={"position": offset}
-                                   if offset is not None else None)
-            self._logger.debug(f"Playing track '{uris}' on device '{device_id}' at position {position_ms}ms.")
+            if context_uri:
+                self.sp.start_playback(device_id=device_id, context_uri=context_uri,
+                                       offset={"position": offset} if offset is not None else None)
+            else:
+                self.sp.start_playback(device_id=device_id, uris=uris, position_ms=position_ms)
+            self._logger.debug(f"Playing on device '{device_id}' at position {position_ms or 0}ms.")
         except Exception as e:
             self._logger.error(f"Failed to start playback: {e}")
             self._logger.error(traceback.format_exc())
